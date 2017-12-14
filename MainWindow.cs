@@ -19,81 +19,124 @@
 *
 */
 using System;
-using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 
-namespace OpenFile
-{
+using Grid;
+using OpenFile;
+using SAXWrapper;
+using Tree;
+
+namespace XmlTreeView {
     /// <summary>
     /// MainWindow.xaml の相互作用ロジック
     /// </summary>
-    public partial class MainWindow : Window
-    {
-        public MainWindow()
-        {
+    public partial class MainWindow : Window {
+        //private TreeViewController tree;
+
+        //private DataGridController grid;
+
+        //private BridgeBetweenTreeAndGrid bridge;
+
+        public MainWindow() {
             InitializeComponent();
 
-            Prepare();
+            View v = new View();
+            v.Show();
+            //tree = new TreeViewController(TreeView);
+            //grid = new DataGridController(DataGrid);
+            //grid.AddColumn(@"Name", @"属性");
+            //grid.AddColumn(@"Value", @"値");
+            //bridge = new BridgeBetweenTreeAndGrid(tree, grid);
+        }
+
+        private void MenuItem_Click(object sender, RoutedEventArgs e) {
+            //try
+            //{
+            //    tree.Tree();
+            //    grid.CreateColumns();
+            //    bridge.AddHandler();
+            //}
+            //catch (Exception ex)
+            //{
+            //    Console.WriteLine(ex.Message + "\r\n" + ex.StackTrace);
+            //}
         }
 
         private OperatorEx gop;
 
-        private FileSystemTreeEx top;
+        private XMLTreeEx top;
 
-        private void Prepare()
-        {
+        private void Prepare() {
             gop = new OperatorEx();
-            gop.Prepare(grid);
-            gop.AddColumn(@"FileName", @"ファイル名");
+            gop.Prepare(DataGrid);
+            gop.AddColumn(@"Name", @"属性");
+            gop.AddColumn(@"Value", @"値");
             gop.CreateColumns();
-            top = new FileSystemTreeEx();
-            top.Prepare(tree);
+            top = new XMLTreeEx();
+            top.Prepare(TreeView);
             top.SetGrid(gop);
-            top.Tree(@"C:\");
+
+
         }
 
-        private class OperatorEx : Grid.Operator
-        {
-            public void DisplayDirectory(Tree.FileSystemNode arg)
-            {
+        private void Menu(object sender, RoutedEventArgs e) {
+            try {
+                OpenFile();
+            }
+            catch (Exception ex) {
+                Console.WriteLine(ex.Message + "\r\n" + ex.StackTrace);
+            }
+        }
+
+        private void OpenFile() {
+            OFWindow w = new OFWindow();
+            w.ShowDialog();
+            string path = w.GetPath();
+            SettingReader reader = new SettingReader();
+            reader.SetDirectory(System.IO.Path.GetDirectoryName(path));
+            reader.SetFileName(System.IO.Path.GetFileName(path));
+            reader.Parse();
+            top.Tree(reader.GetNode());
+        }
+
+        private class OperatorEx : Operator {
+            public void DisplayNode(NodeEntity arg) {
                 Blank();
-                string path = arg.GetPath();
-                System.IO.Directory.EnumerateFiles(path).ToList().ForEach(item =>
-                {
-                    Grid.RowEntity add = new Grid.RowEntity();
-                    add.TrySetMember(Column(0).GetBindName(), item);
+                foreach (AttributeEntity a in arg.GetAttrList()) {
+                    RowEntity add = new RowEntity();
+                    add.TrySetMember(Column(0).GetBindName(), a.GetAttrName());
+                    add.TrySetMember(Column(1).GetBindName(), a.GetAttrValue());
                     AddRow(add);
-                });
+                }
+                RowEntity nodeValue = new RowEntity();
+                nodeValue.TrySetMember(Column(0).GetBindName(), @"Node Value");
+                nodeValue.TrySetMember(Column(1).GetBindName(), arg.GetNodeValue());
+                AddRow(nodeValue);
                 Refresh();
             }
         }
 
-        private class FileSystemTreeEx : Tree.FileSystemTree
-        {
+        private class XMLTreeEx : XMLTree {
             OperatorEx grid;
 
-            public void SetGrid(OperatorEx arg)
-            {
+            public void SetGrid(OperatorEx arg) {
                 grid = arg;
             }
 
-            public new void Tree(string path)
-            {
-                base.Tree(path);
+            public new void Tree(NodeEntity arg) {
+                base.Tree(arg);
                 GetTree().SelectedItemChanged += OnSelect;
             }
 
-            private void OnSelect(object sender, RoutedEventArgs e)
-            {
-                try
-                {
+            private void OnSelect(object sender, RoutedEventArgs e) {
+                try {
                     TreeView senderObj = sender as TreeView;
-                    Tree.FileSystemNode item = senderObj.SelectedItem as Tree.FileSystemNode;
-                    grid.DisplayDirectory(item);
+                    XMLNode senderNode = senderObj.SelectedItem as XMLNode;
+                    NodeEntity arg = senderNode.Tag as NodeEntity;
+                    grid.DisplayNode(arg);
                 }
-                catch (Exception ex)
-                {
+                catch (Exception ex) {
                     Console.WriteLine(ex.Message + "\r\n" + ex.StackTrace);
                 }
             }
